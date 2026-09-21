@@ -1,0 +1,79 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Company {
+  companyKey    Int      @id @default(autoincrement())
+  companyUuid   String   @unique @default(uuid())
+  companyName   String
+  databaseName  String   @unique
+  companyStatus String   @default("ACTIVE")
+  createdAt     DateTime @default(now())
+
+  users         User[]
+  roles         Role[]
+}
+
+model User {
+  userKey       String   @id @default(uuid())
+  companyKey    Int?
+  email         String
+  passwordHash  String
+  emailVerified Boolean  @default(false)
+  userStatus    String   @default("ACTIVE")
+  createdAt     DateTime @default(now())
+
+  company       Company?   @relation(fields: [companyKey], references: [companyKey])
+  userRoles     UserRole[]
+
+  @@unique([companyKey, email])
+  @@index([email])
+}
+
+model Role {
+  roleKey       Int      @id @default(autoincrement())
+  roleName      String
+  companyKey    Int?
+  createdAt     DateTime @default(now())
+
+  company       Company?       @relation(fields: [companyKey], references: [companyKey])
+  userRoles     UserRole[]
+  rolePermissions RolePermission[]
+
+  @@unique([companyKey, roleName])
+}
+
+model Permission {
+  permissionKey  Int      @id @default(autoincrement())
+  permissionName String   @unique
+  createdAt      DateTime @default(now())
+
+  rolePermissions RolePermission[]
+}
+
+model UserRole {
+  userKey String
+  roleKey Int
+
+  user User @relation(fields: [userKey], references: [userKey], onDelete: Cascade)
+  role Role @relation(fields: [roleKey], references: [roleKey], onDelete: Cascade)
+
+  @@id([userKey, roleKey])
+  @@index([roleKey])
+}
+
+model RolePermission {
+  roleKey       Int
+  permissionKey Int
+
+  role       Role       @relation(fields: [roleKey], references: [roleKey], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionKey], references: [permissionKey], onDelete: Cascade)
+
+  @@id([roleKey, permissionKey])
+  @@index([permissionKey])
+}
