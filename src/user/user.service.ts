@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import * as argon2 from 'argon2';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { CreateUserDto } from './dto/create-user.dto.js';
@@ -7,7 +7,7 @@ import { CreateUserDto } from './dto/create-user.dto.js';
 export class UserService {
     constructor(private readonly prisma: PrismaService) { }
 
-    async createUser(dto: CreateUserDto) {
+    async createUser(dto: CreateUserDto, currentUser: { userKey: string; companyKey: number | null },) {
         const company = await this.prisma.company.findUnique({
             where: {
                 companyUuid: dto.companyUuid,
@@ -16,6 +16,23 @@ export class UserService {
 
         if (!company) {
             throw new NotFoundException('Company not found');
+        }
+
+        if (currentUser.companyKey !== null && currentUser.companyKey !== company.companyKey) {
+            throw new ForbiddenException(
+                'You cannot create users for another company',
+            );
+        }
+
+        const existingUser = await this.prisma.user.findFirst({
+            where: {
+                companyKey: company.companyKey,
+                email: dto.email,
+            },
+        });
+
+        if (existingUser) {
+            throw new ConflictException('A user with this email already exists in this company');
         }
 
         const passwordHash = await argon2.hash(dto.password);

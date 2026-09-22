@@ -1,4 +1,4 @@
 export interface CurrentUser {
   userKey: string;
-  companyKey: number;
+  companyKey: number | null;
 }

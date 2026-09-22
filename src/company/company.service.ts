@@ -4,55 +4,63 @@ import { CreateCompanyDto } from './dto/create-company.dto.js';
 
 @Injectable()
 export class CompanyService {
-  constructor(private readonly prisma: PrismaService) {}
+    constructor(private readonly prisma: PrismaService) { }
 
-  async findAll() {
-    return this.prisma.company.findMany();
-  }
+    async findAll(user: { userKey: string; companyKey: number | null }) {
+        if (user.companyKey === null) {
+            return this.prisma.company.findMany();
+        }
 
-  async createCompany(dto: CreateCompanyDto) {
-    const companyUuid = crypto.randomUUID();
+        return this.prisma.company.findMany({
+            where: {
+                companyKey: user.companyKey,
+            },
+        });
+    }
 
-    return this.prisma.$transaction(async (tx) => {
-      const company = await tx.company.create({
-        data: {
-          companyUuid,
-          companyName: dto.companyName,
-          databaseName: `company_${companyUuid}`,
-        },
-      });
+    async createCompany(dto: CreateCompanyDto) {
+        const companyUuid = crypto.randomUUID();
 
-      const roles = await tx.role.createManyAndReturn({
-        data: [
-          {
-            roleName: 'COMPANY_ADMIN',
-            companyKey: company.companyKey,
-          },
-          {
-            roleName: 'USER',
-            companyKey: company.companyKey,
-          },
-        ],
-      });
+        return this.prisma.$transaction(async (tx) => {
+            const company = await tx.company.create({
+                data: {
+                    companyUuid,
+                    companyName: dto.companyName,
+                    databaseName: `company_${companyUuid}`,
+                },
+            });
 
-      const companyAdminRole = roles.find(
-        (role) => role.roleName === 'COMPANY_ADMIN',
-      );
+            const roles = await tx.role.createManyAndReturn({
+                data: [
+                    {
+                        roleName: 'COMPANY_ADMIN',
+                        companyKey: company.companyKey,
+                    },
+                    {
+                        roleName: 'USER',
+                        companyKey: company.companyKey,
+                    },
+                ],
+            });
 
-      if (!companyAdminRole) {
-        throw new Error('COMPANY_ADMIN role was not created');
-      }
+            const companyAdminRole = roles.find(
+                (role) => role.roleName === 'COMPANY_ADMIN',
+            );
 
-      const permissions = await tx.permission.findMany();
+            if (!companyAdminRole) {
+                throw new Error('COMPANY_ADMIN role was not created');
+            }
 
-      await tx.rolePermission.createMany({
-        data: permissions.map((permission) => ({
-          roleKey: companyAdminRole.roleKey,
-          permissionKey: permission.permissionKey,
-        })),
-      });
+            const permissions = await tx.permission.findMany();
 
-      return company;
-    });
-  }
+            await tx.rolePermission.createMany({
+                data: permissions.map((permission) => ({
+                    roleKey: companyAdminRole.roleKey,
+                    permissionKey: permission.permissionKey,
+                })),
+            });
+
+            return company;
+        });
+    }
 }
