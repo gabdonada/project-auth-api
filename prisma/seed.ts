@@ -10,14 +10,15 @@ const prisma = new PrismaClient({ adapter });
 
 async function main() {
     const permissions = [
-        'COMPANY_VIEW',
-        'COMPANY_EDIT',
-        'COMPANY_CREATE',
-        'USER_CREATE',
-        'USER_EDIT',
-        'USER_DISABLE',
-        'WORKFLOW_VIEW',
-        'WORKFLOW_EDIT',
+        'COMPANY_VIEW', // View companies and their basic information.
+        'COMPANY_EDIT', // Create and update company information/settings.
+        'COMPANY_CREATE', // Create new companies/tenants on the platform.
+        'USER_VIEW', // View users within the user's allowed tenant scope.
+        'USER_CREATE', // Create users within the user's allowed tenant scope.
+        'USER_EDIT', // Edit user information within the user's allowed tenant scope.
+        'USER_DISABLE', // Disable users within the user's allowed tenant scope.
+        'WORKFLOW_VIEW', // View workflow data and status.
+        'WORKFLOW_EDIT', // Create, update, and manage workflow configuration.
     ];
 
     for (const permissionName of permissions) {
