@@ -17,6 +17,7 @@ async function main() {
         'USER_CREATE', // Create users within the user's allowed tenant scope.
         'USER_EDIT', // Edit user information within the user's allowed tenant scope.
         'USER_DISABLE', // Disable users within the user's allowed tenant scope.
+        'USER_ROLE_EDIT', // Assign and remove roles from users within the user's allowed tenant scope.
         'WORKFLOW_VIEW', // View workflow data and status.
         'WORKFLOW_EDIT', // Create, update, and manage workflow configuration.
     ];

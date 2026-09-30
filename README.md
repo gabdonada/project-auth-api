@@ -1,124 +1,909 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# Project Auth API
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+Authentication and authorization service for a multi-tenant SaaS platform.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+The goal is to provide a reusable foundation for the SaaS: authentication, authorization, tenant management, user management, and eventually tenant-specific business databases and services.
 
-## Description
+---
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+## Current Status
 
-## Project setup
+The project currently provides:
 
-```bash
-$ npm install
+* JWT authentication
+* Password hashing with Argon2
+* Multi-tenant company model
+* User management
+* Role-based authorization
+* Permission-based access control
+* Platform-level and company-level roles
+* Tenant isolation for company users
+* Separate public UUIDs and internal database keys
+* PostgreSQL persistence through Prisma
+* Docker-based local PostgreSQL environment
+
+The project is still in development and is **not production-ready**.
+
+---
+
+# Architecture
+
+The initial architecture separates authentication/authorization data from business data.
+
+```text
+                    ┌─────────────────────┐
+                    │      Frontend       │
+                    │   Web / Mobile      │
+                    └──────────┬──────────┘
+                               │
+                               ▼
+                    ┌─────────────────────┐
+                    │     Auth API        │
+                    │      NestJS         │
+                    └──────────┬──────────┘
+                               │
+             ┌─────────────────┴─────────────────┐
+             │                                   │
+             ▼                                   ▼
+      ┌───────────────┐                  ┌────────────────┐
+      │   Auth DB     │                  │ Business DB(s) │
+      │  PostgreSQL   │                  │ PostgreSQL     │
+      │               │                  │                │
+      │ Companies     │                  │ Company 1      │
+      │ Users         │                  │ Company 2      │
+      │ Roles         │                  │ Company 3      │
+      │ Permissions   │                  │ ...            │
+      └───────────────┘                  └────────────────┘
 ```
 
-## Compile and run the project
+The Auth DB contains platform and identity information.
 
-```bash
-# development
-$ npm run start
+Each company will eventually have its own business database.
 
-# watch mode
-$ npm run start:dev
+This keeps authentication/authorization concerns separate from the actual business domain.
 
-# production mode
-$ npm run start:prod
+---
+
+# Technology Stack
+
+* Node.js 24
+* NestJS 12
+* TypeScript
+* PostgreSQL 17
+* Prisma 7
+* Docker / Docker Compose
+* JWT
+* Passport
+* Argon2
+* class-validator
+* AWS services planned for production
+
+---
+
+# Authentication
+
+Authentication is handled by the Auth API.
+
+## Login
+
+```http
+POST /auth/login
 ```
 
-## Run tests
+The API:
 
-```bash
-# unit tests
-$ npm run test
+1. Finds the user.
+2. Verifies the password using Argon2.
+3. Generates a JWT.
+4. Returns the access token.
 
-# e2e tests
-$ npm run test:e2e
+Example response:
 
-# test coverage
-$ npm run test:cov
+```json
+{
+  "accessToken": "..."
+}
 ```
 
-## Deployment
+The JWT currently contains:
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
-
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
-
-```bash
-$ npm install -g @nestjs/mau
-$ mau deploy
+```json
+{
+  "userKey": "...",
+  "companyKey": 3,
+  "iat": 1234567890,
+  "exp": 1234654290
+}
 ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+Tokens currently expire after **24 hours**.
 
-## Observability
+Roles and permissions are intentionally **not stored in the JWT**.
 
-In production applications, observability is essential for understanding how your system behaves, detecting issues early, and maintaining reliable performance.
+This means role/permission changes take effect immediately without waiting for an existing token to expire.
 
-[NestJS Observe](https://observe.nestjs.com) automatically instruments your NestJS application, giving you deep visibility into your system with minimal setup:
+---
 
-- **Distributed tracing:** Follow requests across services and understand how they flow through your system.
-- **Waterfall analysis:** Visualize request execution and identify slow operations, bottlenecks, and unexpected delays.
-- **Performance analysis:** Analyze application performance in real time and quickly pinpoint areas that need optimization.
-- **Metrics:** Track key application and infrastructure metrics to understand system health and performance trends.
-- **Logging:** Centralize and correlate logs with traces and other telemetry to make debugging easier.
-- **Error tracking:** Detect errors quickly and investigate their root causes with the surrounding context.
-- **SLA monitoring:** Track service-level objectives and identify when your application is approaching or exceeding defined thresholds.
-- **Alarms and alerts:** Set up alerts for critical errors, performance degradation, SLA violations, and other anomalies so your team can react quickly.
+# Authorization
 
-To add it to this project:
+Authorization uses:
 
-```bash
-$ npm install @nestjs/observe
+```text
+User
+  │
+  ▼
+UserRole
+  │
+  ▼
+Role
+  │
+  ▼
+RolePermission
+  │
+  ▼
+Permission
 ```
 
-Then follow the [setup guide](https://docs.nestjs.com/observability/overview) - it takes a single import and an app key.
+Permissions represent capabilities such as:
 
-The free plan needs no payment details and covers 300,000 events a month. You can also browse the [live demo](https://www.observe-demo.nestjs.com/dashboard) first - the whole dashboard over a busy service's data, with nothing to install.
+```text
+COMPANY_VIEW
+COMPANY_EDIT
+COMPANY_CREATE
 
-## Resources
+USER_VIEW
+USER_CREATE
+USER_EDIT
+USER_DISABLE
+USER_ROLE_EDIT
 
-Check out a few resources that may come in handy when working with NestJS:
+WORKFLOW_VIEW
+WORKFLOW_EDIT
+```
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Auto-instrument your application with [NestJS Observe](https://observe.nestjs.com). Distributed tracing, metrics, and logging made easy. Error tracking and performance monitoring for your NestJS applications.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+Endpoints declare the permission they require.
 
-## Support
+Example:
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+```ts
+@UseGuards(JwtAuthGuard, PermissionGuard)
+@RequirePermission('USER_CREATE')
+```
 
-## Stay in touch
+The permission guard checks the user's current roles and permissions directly in the database.
 
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+---
 
-## License
+# Roles
 
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+The system supports both global and company-scoped roles.
+
+## Platform role
+
+```text
+PLATFORM_ADMIN
+```
+
+A global role.
+
+Its `companyKey` is `NULL`.
+
+Platform administrators can manage platform-level resources and companies.
+
+## Company roles
+
+```text
+COMPANY_ADMIN
+USER
+```
+
+These belong to a specific company.
+
+For example:
+
+```text
+Company 3
+ ├── COMPANY_ADMIN
+ └── USER
+
+Company 4
+ ├── COMPANY_ADMIN
+ └── USER
+```
+
+A company administrator cannot see or assign the global `PLATFORM_ADMIN` role.
+
+The restriction is enforced by the API, not just the frontend.
+
+---
+
+# Multi-Tenancy
+
+A user normally belongs to one company.
+
+```text
+User
+ └── companyKey → Company
+```
+
+Platform users can have:
+
+```text
+companyKey = NULL
+```
+
+This allows platform-level users to operate across companies.
+
+Company users are restricted to their own company.
+
+For example:
+
+```text
+Company A user
+    │
+    ├── Can access Company A
+    │
+    └── Cannot access Company B
+```
+
+Tenant isolation is enforced inside the service layer.
+
+---
+
+# Database Model
+
+The current authorization database contains:
+
+```text
+Company
+User
+Role
+Permission
+UserRole
+RolePermission
+```
+
+Simplified relationship:
+
+```text
+Company
+   │
+   ├── Users
+   │
+   └── Roles
+          │
+          └── RolePermissions
+                    │
+                    └── Permissions
+
+User
+   │
+   └── UserRoles
+             │
+             └── Roles
+```
+
+## Company identifiers
+
+Companies have two identifiers:
+
+```text
+companyKey
+```
+
+Internal database key.
+
+```text
+companyUuid
+```
+
+Public identifier.
+
+The business database name will use the public UUID:
+
+```text
+company_<companyUuid>
+```
+
+This avoids exposing sequential internal database identifiers as the public company identity.
+
+---
+
+# User Management
+
+The current API supports:
+
+### Create user
+
+```http
+POST /users
+```
+
+Creates a user inside a company.
+
+New users are initially assigned the company `USER` role.
+
+Passwords are stored as Argon2 hashes and are never returned by the API.
+
+---
+
+### List users
+
+```http
+GET /users
+```
+
+Platform administrators can see users across the platform.
+
+Company users can only see users belonging to their company.
+
+---
+
+### View user
+
+```http
+GET /users/:userKey
+```
+
+Returns information about a specific user while enforcing tenant isolation.
+
+---
+
+### Update user
+
+```http
+PATCH /users/:userKey
+```
+
+Currently allows administrative changes such as:
+
+* Email
+* User status
+
+This requires:
+
+```text
+USER_EDIT
+```
+
+---
+
+### Disable user
+
+```http
+PATCH /users/:userKey/disable
+```
+
+Disables a user without deleting their record.
+
+This requires:
+
+```text
+USER_DISABLE
+```
+
+Keeping the record preserves historical relationships and auditability.
+
+---
+
+# Role Management
+
+### View available roles
+
+```http
+GET /users/roles
+```
+
+Platform administrators can see all roles.
+
+Company administrators only see roles belonging to their own company.
+
+Therefore, company administrators cannot even see:
+
+```text
+PLATFORM_ADMIN
+```
+
+---
+
+### View user's roles
+
+```http
+GET /users/:userKey/roles
+```
+
+Returns the roles currently assigned to a user.
+
+Tenant isolation is enforced.
+
+---
+
+### Assign role
+
+```http
+POST /users/:userKey/roles
+```
+
+Example:
+
+```json
+{
+  "roleKey": 5
+}
+```
+
+Requires:
+
+```text
+USER_ROLE_EDIT
+```
+
+A company administrator can assign company-scoped roles to users in their company, including:
+
+```text
+USER
+COMPANY_ADMIN
+```
+
+A company administrator cannot assign:
+
+```text
+PLATFORM_ADMIN
+```
+
+Platform administrators can assign any role.
+
+---
+
+# Company Management
+
+Current endpoint:
+
+```http
+GET /companies
+```
+
+Platform administrators can see all companies.
+
+Company users only see their own company.
+
+Company creation:
+
+```http
+POST /companies/createCompany
+```
+
+Currently restricted to users with:
+
+```text
+COMPANY_CREATE
+```
+
+Creating a company also creates the initial company roles and permissions needed by the tenant.
+
+---
+
+# Local Development
+
+PostgreSQL runs through Docker Compose.
+
+```text
+PostgreSQL 17
+    │
+    └── auth_db
+```
+
+Connection:
+
+```text
+postgresql://auth_api:auth_api_dev@localhost:5432/auth_db
+```
+
+Start the database:
+
+```bash
+docker compose up -d
+```
+
+Run Prisma migrations/generation as required:
+
+```bash
+npx prisma generate
+```
+
+Run the application:
+
+```bash
+npm run start:dev
+```
+
+---
+
+# Project Structure
+
+Current structure:
+
+```text
+src/
+├── auth/
+│   ├── decorators/
+│   ├── guards/
+│   ├── interfaces/
+│   ├── auth.controller.ts
+│   ├── auth.module.ts
+│   ├── auth.service.ts
+│   ├── jwt-auth.guard.ts
+│   └── jwt.strategy.ts
+│
+├── company/
+│   ├── dto/
+│   ├── company.controller.ts
+│   ├── company.module.ts
+│   └── company.service.ts
+│
+├── user/
+│   ├── dto/
+│   ├── user.controller.ts
+│   ├── user.module.ts
+│   └── user.service.ts
+│
+├── prisma/
+│   ├── prisma.module.ts
+│   └── prisma.service.ts
+│
+├── generated/
+│   └── Prisma client
+│
+├── app.module.ts
+└── main.ts
+
+prisma/
+├── schema.prisma
+└── seed.ts
+```
+
+---
+
+# Security Principles
+
+The project is being built around a few principles:
+
+### Authentication ≠ authorization
+
+Authentication answers:
+
+> Who are you?
+
+Authorization answers:
+
+> What are you allowed to do?
+
+---
+
+### Permissions are data-driven
+
+Business permissions are stored in the database instead of being hardcoded throughout the application.
+
+This allows new roles and permission combinations to be created without changing authorization logic.
+
+---
+
+### Tenant isolation is server-side
+
+The frontend should never be trusted to determine which company a user can access.
+
+Every relevant service verifies the user's company scope.
+
+---
+
+### Passwords never leave the Auth API
+
+Only password hashes are stored.
+
+Passwords are never included in normal API responses.
+
+---
+
+### Roles are not trusted from the client
+
+The client sends a requested role, but the API verifies whether the current user is allowed to assign that role.
+
+---
+
+# Roadmap
+
+## Phase 0 — Foundation
+
+**Status: Complete**
+
+* NestJS project
+* TypeScript
+* PostgreSQL
+* Docker
+* Prisma
+* Environment configuration
+* Basic project structure
+
+---
+
+## Phase 1 — Authentication & Authorization
+
+**Status: Mostly complete**
+
+* [x] User authentication
+* [x] Password hashing
+* [x] JWT
+* [x] JWT guard
+* [x] Permission guard
+* [x] Permission decorator
+* [x] Roles
+* [x] Permissions
+* [x] Company-scoped authorization
+* [x] Platform administrator
+* [ ] Automated unit tests
+* [ ] Authentication edge cases
+* [ ] Production security hardening
+
+---
+
+## Phase 2 — User Management
+
+**Status: In progress**
+
+* [x] Create users
+* [x] List users
+* [x] View user
+* [x] Update user
+* [x] Disable user
+* [x] View available roles
+* [x] View user's roles
+* [x] Assign roles
+* [ ] Remove roles
+* [ ] Email verification
+* [ ] Password reset
+* [ ] Self-service account management
+* [ ] Automated tests
+
+---
+
+## Phase 3 — Company Management
+
+**Next major area**
+
+Planned:
+
+* Company CRUD
+* Company status management
+* Company settings
+* Company administrator management
+* Company provisioning workflow
+* Database provisioning
+* Database lifecycle management
+
+---
+
+## Phase 4 — Tenant Business Databases
+
+Each company will eventually receive its own business database.
+
+Example:
+
+```text
+Auth DB
+ │
+ ├── Company A
+ │      └── company_a_database
+ │
+ ├── Company B
+ │      └── company_b_database
+ │
+ └── Company C
+        └── company_c_database
+```
+
+Planned:
+
+* Database creation
+* Database credentials
+* Tenant connection management
+* Provisioning automation
+* Migration management
+* Failure/retry handling
+* Tenant database lifecycle
+
+---
+
+## Phase 5 — First Business Module
+
+The first real business functionality will be implemented here.
+
+The exact domain is still to be defined.
+
+Expected architecture:
+
+```text
+Frontend
+   │
+   ▼
+API Gateway / Backend
+   │
+   ├── Auth
+   ├── Company
+   ├── User
+   └── Business Service
+             │
+             ▼
+        Tenant DB
+```
+
+The business domain should remain independent from authentication logic.
+
+---
+
+## Phase 6 — Files
+
+Planned AWS S3 integration for:
+
+* Company files
+* User uploads
+* Business documents
+* Attachments
+* Generated files
+
+The API will control authorization while S3 handles object storage.
+
+---
+
+## Phase 7 — Web Frontend
+
+Planned:
+
+* Login
+* Company dashboard
+* User management
+* Role management
+* Business workflows
+* File management
+* Administration
+
+AWS Amplify is currently the preferred direction for hosting the web frontend because of the low operational overhead.
+
+---
+
+## Phase 8 — Production Infrastructure
+
+Planned AWS infrastructure:
+
+```text
+                    ┌───────────────┐
+                    │   Frontend    │
+                    │    Amplify    │
+                    └───────┬───────┘
+                            │
+                            ▼
+                    ┌───────────────┐
+                    │    Backend    │
+                    │    Services   │
+                    └───────┬───────┘
+                            │
+             ┌──────────────┼──────────────┐
+             ▼              ▼              ▼
+          Auth DB       Tenant DBs         S3
+```
+
+Infrastructure will prioritize:
+
+* Low operational overhead
+* Low baseline cost
+* Scalability
+* Security
+* Automated deployments
+
+---
+
+## Phase 9 — Billing
+
+Planned SaaS billing model.
+
+The initial business model is expected to be based on usage, potentially using the number of opened production/service orders (`OP`) as a pricing metric.
+
+Example concept:
+
+```text
+Customer
+30 OP/month
+     │
+     ▼
+SaaS subscription / usage price
+```
+
+Infrastructure costs will be tracked against usage to understand the actual margin per customer.
+
+---
+
+## Phase 10 — SaaS Operations
+
+Planned:
+
+* Monitoring
+* Logging
+* Alerts
+* Backups
+* Database migrations
+* Error handling
+* Customer administration
+* Usage metrics
+* Cost monitoring
+* Security hardening
+
+---
+
+## Phase 11 — Mobile
+
+A mobile application can be added once the backend and web application are stable.
+
+The backend APIs should be designed so that:
+
+```text
+Web
+ │
+ ├──────────┐
+ │          │
+ ▼          ▼
+API      Mobile
+ │
+ ▼
+Business Services
+```
+
+Both clients use the same backend authorization model.
+
+---
+
+# MVP Definition
+
+The first meaningful SaaS milestone is a customer being able to use the system end-to-end.
+
+```text
+Authentication
+      ↓
+Authorization
+      ↓
+Company
+      ↓
+Users
+      ↓
+Tenant Provisioning
+      ↓
+Core Business Workflow
+      ↓
+Files
+      ↓
+Web UI
+      ↓
+Production Deployment
+      ↓
+Billing
+```
+
+The objective is not to build every possible feature before launch.
+
+The objective is to establish a solid multi-tenant foundation and then deliver the smallest useful business workflow that a real customer can pay for.
+
+---
+
+# Development Philosophy
+
+The project favors:
+
+* Simple architecture
+* Clear service boundaries
+* Low operational overhead
+* Data-driven authorization
+* Server-side tenant isolation
+* Incremental development
+* Automated testing as functionality stabilizes
+* AWS managed services where they reduce maintenance
+* Avoiding premature complexity
+
+The architecture should be capable of growing into multiple services without requiring a complete rewrite, while keeping the initial system understandable and inexpensive to operate.

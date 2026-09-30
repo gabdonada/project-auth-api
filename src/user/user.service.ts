@@ -3,6 +3,7 @@ import * as argon2 from 'argon2';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { CreateUserDto } from './dto/create-user.dto.js';
 import { UpdateUserDto } from './dto/update-user.dto.js';
+import { UpdateUserRoleDto } from './dto/update-user-role.dto.js';
 
 @Injectable()
 export class UserService {
@@ -201,6 +202,121 @@ export class UserService {
                 emailVerified: true,
                 userStatus: true,
                 createdAt: true,
+            },
+        });
+    }
+
+    async assignRole(userKey: string, dto: UpdateUserRoleDto, currentUser: { userKey: string; companyKey: number | null }) {
+        const user = await this.prisma.user.findUnique({
+            where: {
+                userKey,
+            },
+        });
+
+        if (!user) {
+            throw new NotFoundException('User not found');
+        }
+
+        if (currentUser.companyKey !== null && currentUser.companyKey !== user.companyKey) {
+            throw new ForbiddenException(
+                'You cannot manage roles for users from another company',
+            );
+        }
+
+        const role = await this.prisma.role.findUnique({
+            where: {
+                roleKey: dto.roleKey,
+            },
+        });
+
+        if (!role) {
+            throw new NotFoundException('Role not found');
+        }
+
+        if (currentUser.companyKey !== null && role.companyKey !== currentUser.companyKey) {
+            throw new ForbiddenException(
+                'You cannot assign a role from another company',
+            );
+        }
+
+        const existingUserRole = await this.prisma.userRole.findUnique({
+            where: {
+                userKey_roleKey: {
+                    userKey,
+                    roleKey: role.roleKey,
+                },
+            },
+        });
+
+        if (existingUserRole) {
+            throw new ConflictException('User already has this role');
+        }
+
+        await this.prisma.userRole.create({
+            data: {
+                userKey,
+                roleKey: role.roleKey,
+            },
+        });
+
+        return {
+            userKey,
+            roleKey: role.roleKey,
+        };
+    }
+
+    async findRoles(userKey: string, currentUser: { userKey: string; companyKey: number | null }) {
+        const user = await this.prisma.user.findUnique({
+            where: {
+                userKey,
+            },
+        });
+
+        if (!user) {
+            throw new NotFoundException('User not found');
+        }
+
+        if (currentUser.companyKey !== null && currentUser.companyKey !== user.companyKey) {
+            throw new ForbiddenException(
+                'You cannot view roles for users from another company',
+            );
+        }
+
+        return this.prisma.userRole.findMany({
+            where: {
+                userKey,
+            },
+            select: {
+                role: {
+                    select: {
+                        roleKey: true,
+                        roleName: true,
+                        companyKey: true,
+                    },
+                },
+            },
+        });
+    }
+
+    async findAvailableRoles(currentUser: { userKey: string; companyKey: number | null }) {
+        if (currentUser.companyKey === null) {
+            return this.prisma.role.findMany({
+                select: {
+                    roleKey: true,
+                    roleName: true,
+                    companyKey: true,
+                },
+            });
+        }
+
+        return this.prisma.role.findMany({
+            where: {
+                companyKey: currentUser.companyKey,
+            },
+            select: {
+                roleKey: true,
+                roleName: true,
+                companyKey: true,
             },
         });
     }
